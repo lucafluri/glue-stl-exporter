@@ -17,10 +17,10 @@ with open('stlexporter/version.py') as infile:
 
 setup(name='stlexporter',
       version=__version__,
-      description='STL Exporter',
+      description=LONG_DESCRIPTION,
       long_description="Provides STL export functionality for the 3D volume renderer",
       url="https://github.com/lucafluri/glue-stl-exporter",
-      author='',
+      author='Andreas Ambühl, Luca Fluri',
       author_email='',
       packages = find_packages(),
       package_data={},
