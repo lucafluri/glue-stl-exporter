@@ -5,8 +5,7 @@ import pyvista as pv
 from scipy.ndimage import filters
 
 from PyQt5.QtWidgets import QFileDialog, QProgressDialog
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
+from PyQt5.QtCore import Qt 
 
 import glue
 from stlexporter import ICON
@@ -19,7 +18,6 @@ class StlExporter(Tool):
     tool_id = 'stl_exporter'
     action_text = 'STL Exporter'
     tool_tip = 'STL Exporter'
-    shortcut = 'D'
 
     def __init__(self, viewer):
         super(StlExporter, self).__init__(viewer)
@@ -30,22 +28,22 @@ class StlExporter(Tool):
         if(savePath == ""): # Cancel if Prompt was cancelled
             return
 
-        # grab the 3D volume viewer, the one one that exists in the current glue session
+        # grab viewer
         viewer = self.viewer
 
-        #get the data layers of the viewer. In our case there's only one layer (the perseus data)
+        #get the data layers of the viewer.
         layers =  viewer.state.layers
 
         #grab the xyz bounds of the viewer
         bounds = [(viewer.state.z_min, viewer.state.z_max, viewer.state.resolution), (viewer.state.y_min, viewer.state.y_max, viewer.state.resolution), (viewer.state.x_min, viewer.state.x_max, viewer.state.resolution)]
 
-
+        # Create Progress Dialog
         progress = QProgressDialog("Creating STL files...", None, 0, len(layers))
-        # progress.setWindowModality(Qt.WindowModal)
-        progress.setWindowTitle("STL Export Progress")
+        progress.setWindowTitle("STL Export")
         progress.setWindowModality(Qt.WindowModal)
         progress.forceShow()
         progress.setValue(0)
+
         count = 0
 
         for layer in layers:
@@ -55,6 +53,7 @@ class StlExporter(Tool):
                 datacube=layer.layer.data.compute_fixed_resolution_buffer(target_data=viewer.state.reference_data, bounds=bounds,target_cid=layer.attribute)
                 data=subcube*datacube
 
+                # Name file with main data layer at beginning if subset
                 filename = layer.layer.data.label + "_" + layer.layer.label + ".stl"
 
                 for i in range(0,len(viewer.state.layers)):
@@ -70,9 +69,6 @@ class StlExporter(Tool):
 
                 filename = layer.layer.label + ".stl"
             
-            #now grab the 3D array of data, as a numpy array
-            # data=layers.layer.compute_fixed_resolution_buffer(target_data=viewer.state.reference_data, bounds=bounds, target_cid=layers.attribute)
-
             #apply smoothing to the data to create nicer surfaces on the model. Ultimately we will probably want users to set this
             data = filters.gaussian_filter(data,1) 
 
@@ -99,11 +95,10 @@ class StlExporter(Tool):
 
             grid.point_arrays["values"] = data.flatten(order="F")  #add the data values to the cell data and flatten the array
 
-            #create an isosurface at a value of 35. We will want to ultimately open a GUI for user to pick this themselves. 
+            # We will want to ultimately open a GUI for user to pick this themselves. 
+            # Currently the min limit of the main layer is used
             iso_data = grid.contour([isomin]) 
 
-            #save it to file. We will want to ask the user what they actually want to call it, and where to save it. 
-            
             iso_data.save(savePath + "\\" + filename) #save an STL file
 
             count += 1
