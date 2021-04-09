@@ -13,7 +13,6 @@ from stlexporter import ICON
 
 @viewer_tool
 class StlExporter(Tool):
-
     icon = ICON
     tool_id = 'stl_exporter'
     action_text = 'STL Exporter'
