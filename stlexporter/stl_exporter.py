@@ -18,7 +18,7 @@ class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Nested Layouts Example")
-        self.setMinimumSize(300, 400)
+        self.setMinimumSize(500, 600)
 
 
 
@@ -28,9 +28,7 @@ class MainWindow(QWidget):
         # Create a form layout for the label and line edit
         topLayout = QVBoxLayout()
         listView = QListWidget()
-        detailView = QHBoxLayout()
-
-        
+        detailView = QHBoxLayout() # detailView for selecting options for the selected layer
 
 
 
@@ -56,14 +54,20 @@ class MainWindow(QWidget):
             item = QListWidgetItem(filename)
             item.setCheckState(Qt.Checked)
             listView.addItem(item)
-            
 
-        selectedLabel = QLabel("TEST")
-        isoInput = QSpinBox()
 
-        detailView.addWidget(selectedLabel)
-        detailView.addWidget(isoInput)
+        # detailView for selecting options for the selected layer
+        # Register action -> https://stackoverflow.com/questions/9313227/how-to-send-the-selected-item-in-the-listwidget-to-another-function-as-a-paramet/9315013
+        listView.itemClicked.connect(self.update_detailView)
 
+        self.selectedLabel = QLabel("TEST")
+        self.isoInput = QSpinBox()
+
+        detailView.addWidget(self.selectedLabel)
+        detailView.addWidget(self.isoInput)
+
+
+        # optionsLayout for Save/Cancel buttons
         optionsLayout = QHBoxLayout()
         # Add some checkboxes to the layout
         self.buttonSave = QPushButton("Save")
@@ -82,6 +86,12 @@ class MainWindow(QWidget):
         outerLayout.addLayout(optionsLayout)
         # Set the window's main layout
         self.setLayout(outerLayout)
+
+
+    def update_detailView(self, clickedItem):
+        print('selectedItem in update_detailView: ', clickedItem.text())
+        self.selectedLabel.setText(clickedItem.text())
+
 
 
     def show_new_window(self, viewer, layers, listView):
