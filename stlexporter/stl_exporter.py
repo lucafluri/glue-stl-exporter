@@ -30,10 +30,12 @@ class MainWindow(QWidget):
         listView = QListWidget()
         detailView = QHBoxLayout() # detailView for selecting options for the selected layer
 
+        layerDict = {}
 
 
         # Create the options:
         for layer in layers:
+
             #check if subset object
             if isinstance(layer.layer,glue.core.subset_group.GroupedSubset):
                 # Name file with main data layer at beginning if subset
@@ -55,13 +57,22 @@ class MainWindow(QWidget):
             item.setCheckState(Qt.Checked)
             listView.addItem(item)
 
+            layerDict[filename] = {
+                # "item": item,
+                "filename": filename,
+                "isomin": isomin,
+                "isomax": isomax
+            }
+
+
 
         # detailView for selecting options for the selected layer
         # Register action -> https://stackoverflow.com/questions/9313227/how-to-send-the-selected-item-in-the-listwidget-to-another-function-as-a-paramet/9315013
-        listView.itemClicked.connect(self.update_detailView)
+        listView.itemClicked.connect(lambda item: self.update_detailView(item, layerDict[item.text()]))
 
-        self.selectedLabel = QLabel("TEST")
+        self.selectedLabel = QLabel("")
         self.isoInput = QSpinBox()
+        self.isoInput.setDisabled(True)
 
         detailView.addWidget(self.selectedLabel)
         detailView.addWidget(self.isoInput)
@@ -88,9 +99,12 @@ class MainWindow(QWidget):
         self.setLayout(outerLayout)
 
 
-    def update_detailView(self, clickedItem):
-        print('selectedItem in update_detailView: ', clickedItem.text())
+    def update_detailView(self, clickedItem, itemDict):
+        # print('selectedItem in update_detailView: ', clickedItem.text())
+        # print(itemDict)
         self.selectedLabel.setText(clickedItem.text())
+        self.isoInput.setDisabled(False)
+        self.isoInput.setValue(itemDict['isomin'])
 
 
 
