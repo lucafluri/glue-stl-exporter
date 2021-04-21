@@ -41,6 +41,11 @@ class MainWindow(QWidget):
                 # Name file with main data layer at beginning if subset
                 filename = layer.layer.data.label + "_" + layer.layer.label
 
+                isSubLayer = True
+
+                #TODO: this seems wrong - because the isolayers are changed now alltogether ?!?
+                #  in the GUI of glue, there are NO isomin/isomax settings for sub-layers,
+                #  so what is this for?
                 for i in range(0,len(layers)):
                     if layers[i].layer is layer.layer.data:
                         isomin=layers[i].vmin
@@ -48,6 +53,7 @@ class MainWindow(QWidget):
 
             #otherwise a data object
             else:
+                isSubLayer = False
                 isomin=layer.vmin
                 isomax=layer.vmax
 
@@ -57,11 +63,15 @@ class MainWindow(QWidget):
             item.setCheckState(Qt.Checked)
             listView.addItem(item)
 
+            # TODO: Use this dict also to actually save the data.
+            #  Decause in here, the 'isomin' will be updated, when the user changes this.
+            #  And this dict conveniently contains all necessary data.
             layerDict[filename] = {
-                # "item": item,
+                "item": item,
+                "isSubLayer": isSubLayer,
                 "filename": filename,
                 "isomin": isomin,
-                "isomax": isomax
+                "isomax": isomax,
             }
 
 
@@ -103,9 +113,30 @@ class MainWindow(QWidget):
         # print('selectedItem in update_detailView: ', clickedItem.text())
         # print(itemDict)
         self.selectedLabel.setText(clickedItem.text())
-        self.isoInput.setDisabled(False)
-        self.isoInput.setValue(itemDict['isomin'])
 
+        # Disconnect necessary, because otherwise, the self.isoInput.valueChanged.connect(..)
+        # would still be active and change OTHER layers instead as well, when switching back
+        # and forth between layers!
+        # Tested with    glue ..\subsets-test\perseus_and_taurus.glu
+        self.isoInput.disconnect()
+
+        # TODO: Verify: as far as I know, isomin/isomax is only present for layers
+        #  (in the GUI, I couldn't find any settings regarding this)
+        #  -> be careful about this when saving later on!
+        if itemDict['isSubLayer']:
+            self.isoInput.setDisabled(True)
+        else:
+            self.isoInput.setValue(itemDict['isomin'])
+            self.isoInput.setDisabled(False)
+            self.isoInput.valueChanged.connect(lambda newValue: self.update_isomin(newValue, itemDict))
+
+
+
+    def update_isomin(self, newValue, itemDict):
+        # ONLY change the value, if there was a actual change:
+        if newValue != itemDict['isomin']:
+            itemDict['isomin'] = newValue
+            print('isomin of', itemDict['filename'], 'changed to', newValue)
 
 
     def show_new_window(self, viewer, layers, listView):
