@@ -89,6 +89,7 @@ class MainWindow(QWidget):
         if(self.savePath == ""): # Cancel if Prompt was cancelled
             return
 
+        self.close()
 
         #grab the xyz bounds of the viewer
         bounds = [(viewer.state.z_min, viewer.state.z_max, viewer.state.resolution), (viewer.state.y_min, viewer.state.y_max, viewer.state.resolution), (viewer.state.x_min, viewer.state.x_max, viewer.state.resolution)]
@@ -167,9 +168,6 @@ class MainWindow(QWidget):
 
             count += 1
             progress.setValue(count)
-
-
-
 
 
 
