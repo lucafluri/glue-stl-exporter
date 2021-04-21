@@ -178,7 +178,6 @@ class StlExporter(Tool):
     action_text = 'STL Exporter'
     tool_tip = 'STL Exporter'
 
-    dialog = MainWindow()
 
     def __init__(self, viewer):
         super(StlExporter, self).__init__(viewer)
@@ -188,6 +187,7 @@ class StlExporter(Tool):
         pass
 
     def activate(self):
+        dialog = MainWindow()
         # Dialog Test
         # grab viewer
         viewer = self.viewer
@@ -198,8 +198,8 @@ class StlExporter(Tool):
 
         # app = QApplication([])
         # # self.dialog.setWindowModality(Qt.WindowModal)
-        self.dialog.create_layout(viewer, layers)
-        self.dialog.show()
+        dialog.create_layout(viewer, layers)
+        dialog.show()
         # app.exec_()
 
         # ------------------
