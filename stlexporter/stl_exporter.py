@@ -28,6 +28,10 @@ class MainWindow(QWidget):
         # Create a form layout for the label and line edit
         topLayout = QVBoxLayout()
         listView = QListWidget()
+        detailView = QHBoxLayout()
+
+        
+
 
 
         # Create the options:
@@ -54,6 +58,12 @@ class MainWindow(QWidget):
             listView.addItem(item)
             
 
+        selectedLabel = QLabel("TEST")
+        isoInput = QSpinBox()
+
+        detailView.addWidget(selectedLabel)
+        detailView.addWidget(isoInput)
+
         optionsLayout = QHBoxLayout()
         # Add some checkboxes to the layout
         self.buttonSave = QPushButton("Save")
@@ -68,6 +78,7 @@ class MainWindow(QWidget):
 
         topLayout.addWidget(listView)
         outerLayout.addLayout(topLayout)
+        outerLayout.addLayout(detailView)
         outerLayout.addLayout(optionsLayout)
         # Set the window's main layout
         self.setLayout(outerLayout)
