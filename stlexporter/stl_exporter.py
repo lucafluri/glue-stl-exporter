@@ -85,7 +85,7 @@ class MainWindow(QWidget):
         self.buttonSave = QPushButton("Save")
         self.buttonCancel = QPushButton("Cancel")
 
-        self.buttonSave.clicked.connect(lambda: self.show_new_window(viewer, layers, listView, layersDict))
+        self.buttonSave.clicked.connect(lambda: self.show_new_window(viewer, layersDict))
         self.buttonCancel.clicked.connect(self.close)
 
         optionsLayout.addWidget(self.buttonSave)
@@ -111,9 +111,8 @@ class MainWindow(QWidget):
         # Tested with    glue ..\subsets-test\perseus_and_taurus.glu
         self.isoInput.disconnect()
 
-        # TODO: Verify: as far as I know, isomin/isomax is only present for layers
-        #  (in the GUI, I couldn't find any settings regarding this)
-        #  -> be careful about this when saving later on!
+        ## Isomin should be set for all (layers and sublayers). If not, activate the following if/else clause again.
+        ## -> be careful about this when saving later on!
         # if itemDict['isSubLayer']:
         #     self.isoInput.setDisabled(True)
         # else:
@@ -130,19 +129,10 @@ class MainWindow(QWidget):
         # ONLY change the value, if there was a actual change:
         if newValue != itemDict['isomin']:
             itemDict['isomin'] = newValue
-            print('isomin of', itemDict['filename'], 'changed to', newValue)
+            # print('isomin of', itemDict['filename'], 'changed to', newValue)
 
 
-    def show_new_window(self, viewer, layers, listView, layersDict):
-        selectedItems = []
-        for index in range(listView.count()):
-            check_box = listView.item(index)
-            state = check_box.checkState()
-            
-            if(state == Qt.Checked):
-                print(listView.item(index).text())
-                selectedItems.append(listView.item(index).text())
-
+    def show_new_window(self, viewer, layersDict):
         selectedDict = {}
         for dictItem in layersDict.values():
             if(dictItem['item'].checkState() == Qt.Checked):
@@ -163,7 +153,7 @@ class MainWindow(QWidget):
         bounds = [(viewer.state.z_min, viewer.state.z_max, viewer.state.resolution), (viewer.state.y_min, viewer.state.y_max, viewer.state.resolution), (viewer.state.x_min, viewer.state.x_max, viewer.state.resolution)]
 
         # Create Progress Dialog
-        progress = QProgressDialog("Creating STL files...", None, 0, len(selectedItems))
+        progress = QProgressDialog("Creating STL files...", None, 0, len(selectedDict))
         progress.setWindowTitle("STL Export")
         progress.setWindowModality(Qt.WindowModal)
         progress.forceShow()
@@ -179,11 +169,6 @@ class MainWindow(QWidget):
 
             #check if subset object
             if isinstance(layer.layer,glue.core.subset_group.GroupedSubset):
-                # filename = layer.layer.data.label + "_" + layer.layer.label
-
-                #TODO: remove old check via 'selectedItems'
-                # if filename not in selectedItems:
-                #     continue
 
                 subcube=layer.layer.data.compute_fixed_resolution_buffer(target_data=viewer.state.reference_data,
                                                                          bounds=bounds,
@@ -193,29 +178,12 @@ class MainWindow(QWidget):
                                                                           target_cid=layer.attribute)
                 data=subcube*datacube
 
-                # Name file with main data layer at beginning if subset
-                
-                #
-                # for i in range(0,len(layers)):
-                #     if layers[i].layer is layer.layer.data:
-                #         isomin=layers[i].vmin
-
-
             #otherwise a data object
             else:
-                # filename = layer.layer.label
-
-                #TODO: remove old check via 'selectedItems'
-                # if filename not in selectedItems:
-                #     continue
-
                 data=layer.layer.compute_fixed_resolution_buffer(target_data=viewer.state.reference_data,
                                                                  bounds=bounds,
                                                                  target_cid=layer.attribute)
-                # isomin=layer.vmin
 
-
-                
 
             #apply smoothing to the data to create nicer surfaces on the model. Ultimately we will probably want users to set this
             data = filters.gaussian_filter(data,1)
