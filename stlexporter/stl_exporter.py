@@ -18,7 +18,7 @@ class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Choose Layers and Sublayers to save")
-        self.setMinimumSize(600, 700)
+        self.setMinimumSize(300, 400)
 
 
 
@@ -111,7 +111,7 @@ class MainWindow(QWidget):
         # print('selectedItem in update_detailView: ', clickedItem.text())
         # print(itemDict)
         self.selectedLabel.setText(clickedItem.text())
-        self.isoInputLabel.setText("Isomin:")
+        self.isoInputLabel.setText("Isosurface level:")
 
         # Disconnect necessary, because otherwise, the self.isoInput.valueChanged.connect(..)
         # would still be active and change OTHER layers instead as well, when switching back
