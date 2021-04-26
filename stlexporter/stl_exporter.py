@@ -30,7 +30,7 @@ class MainWindow(QWidget):
         listView = QListWidget()
         detailView = QHBoxLayout() # detailView for selecting options for the selected layer
 
-        layerDict = {}
+        layersDict = {}
 
 
         # Create the options:
@@ -43,19 +43,15 @@ class MainWindow(QWidget):
 
                 isSubLayer = True
 
-                #TODO: this seems wrong - because the isolayers are changed now alltogether ?!?
-                #  in the GUI of glue, there are NO isomin/isomax settings for sub-layers,
-                #  so what is this for?
+                # Search the vmin in the parent-layer
                 for i in range(0,len(layers)):
                     if layers[i].layer is layer.layer.data:
                         isomin=layers[i].vmin
-                        isomax=layers[i].vmax
 
             #otherwise a data object
             else:
                 isSubLayer = False
                 isomin=layer.vmin
-                isomax=layer.vmax
 
                 filename = layer.layer.label
 
@@ -63,22 +59,17 @@ class MainWindow(QWidget):
             item.setCheckState(Qt.Checked)
             listView.addItem(item)
 
-            # TODO: Use this dict also to actually save the data.
-            #  Decause in here, the 'isomin' will be updated, when the user changes this.
-            #  And this dict conveniently contains all necessary data.
-            layerDict[filename] = {
+            layersDict[filename] = {
+                "layer": layer,
                 "item": item,
                 "isSubLayer": isSubLayer,
                 "filename": filename,
                 "isomin": isomin,
-                "isomax": isomax,
             }
-
-
 
         # detailView for selecting options for the selected layer
         # Register action -> https://stackoverflow.com/questions/9313227/how-to-send-the-selected-item-in-the-listwidget-to-another-function-as-a-paramet/9315013
-        listView.itemClicked.connect(lambda item: self.update_detailView(item, layerDict[item.text()]))
+        listView.itemClicked.connect(lambda item: self.update_detailView(item, layersDict[item.text()]))
 
         self.selectedLabel = QLabel("")
         self.isoInput = QSpinBox()
@@ -94,7 +85,7 @@ class MainWindow(QWidget):
         self.buttonSave = QPushButton("Save")
         self.buttonCancel = QPushButton("Cancel")
 
-        self.buttonSave.clicked.connect(lambda: self.show_new_window(viewer, layers, listView))
+        self.buttonSave.clicked.connect(lambda: self.show_new_window(viewer, layers, listView, layersDict))
         self.buttonCancel.clicked.connect(self.close)
 
         optionsLayout.addWidget(self.buttonSave)
@@ -123,12 +114,15 @@ class MainWindow(QWidget):
         # TODO: Verify: as far as I know, isomin/isomax is only present for layers
         #  (in the GUI, I couldn't find any settings regarding this)
         #  -> be careful about this when saving later on!
-        if itemDict['isSubLayer']:
-            self.isoInput.setDisabled(True)
-        else:
-            self.isoInput.setValue(itemDict['isomin'])
-            self.isoInput.setDisabled(False)
-            self.isoInput.valueChanged.connect(lambda newValue: self.update_isomin(newValue, itemDict))
+        # if itemDict['isSubLayer']:
+        #     self.isoInput.setDisabled(True)
+        # else:
+        #     self.isoInput.setValue(itemDict['isomin'])
+        #     self.isoInput.setDisabled(False)
+        #     self.isoInput.valueChanged.connect(lambda newValue: self.update_isomin(newValue, itemDict))
+        self.isoInput.setValue(itemDict['isomin'])
+        self.isoInput.setDisabled(False)
+        self.isoInput.valueChanged.connect(lambda newValue: self.update_isomin(newValue, itemDict))
 
 
 
@@ -139,7 +133,7 @@ class MainWindow(QWidget):
             print('isomin of', itemDict['filename'], 'changed to', newValue)
 
 
-    def show_new_window(self, viewer, layers, listView):
+    def show_new_window(self, viewer, layers, listView, layersDict):
         selectedItems = []
         for index in range(listView.count()):
             check_box = listView.item(index)
@@ -149,7 +143,15 @@ class MainWindow(QWidget):
                 print(listView.item(index).text())
                 selectedItems.append(listView.item(index).text())
 
-        
+        selectedDict = {}
+        for dictItem in layersDict.values():
+            if(dictItem['item'].checkState() == Qt.Checked):
+                filename = dictItem['filename']
+                selectedDict[filename] = dictItem
+
+        # print('layersDict', layersDict)
+        # print('selectedDict', selectedDict)
+
         self.savePath = QFileDialog.getExistingDirectory()
 
         if(self.savePath == ""): # Cancel if Prompt was cancelled
@@ -169,34 +171,49 @@ class MainWindow(QWidget):
 
         count = 0
 
-        for layer in layers:
+        for selectedItem in selectedDict.values():
+
+            layer = selectedItem['layer']
+            filename = selectedItem['filename']
+            isomin = selectedItem['isomin']
+
             #check if subset object
             if isinstance(layer.layer,glue.core.subset_group.GroupedSubset):
-                filename = layer.layer.data.label + "_" + layer.layer.label
-                if filename not in selectedItems:
-                    continue
+                # filename = layer.layer.data.label + "_" + layer.layer.label
 
-                subcube=layer.layer.data.compute_fixed_resolution_buffer(target_data=viewer.state.reference_data, bounds=bounds, subset_state=layer.layer.subset_state)
-                datacube=layer.layer.data.compute_fixed_resolution_buffer(target_data=viewer.state.reference_data, bounds=bounds,target_cid=layer.attribute)
+                #TODO: remove old check via 'selectedItems'
+                # if filename not in selectedItems:
+                #     continue
+
+                subcube=layer.layer.data.compute_fixed_resolution_buffer(target_data=viewer.state.reference_data,
+                                                                         bounds=bounds,
+                                                                         subset_state=layer.layer.subset_state)
+                datacube=layer.layer.data.compute_fixed_resolution_buffer(target_data=viewer.state.reference_data,
+                                                                          bounds=bounds,
+                                                                          target_cid=layer.attribute)
                 data=subcube*datacube
 
                 # Name file with main data layer at beginning if subset
                 
+                #
+                # for i in range(0,len(layers)):
+                #     if layers[i].layer is layer.layer.data:
+                #         isomin=layers[i].vmin
 
-                for i in range(0,len(layers)):
-                    if layers[i].layer is layer.layer.data:
-                        isomin=layers[i].vmin
-                        isomax=layers[i].vmax
 
             #otherwise a data object
             else:
-                filename = layer.layer.label
-                if filename not in selectedItems:
-                    continue
+                # filename = layer.layer.label
 
-                data=layer.layer.compute_fixed_resolution_buffer(target_data=viewer.state.reference_data, bounds=bounds, target_cid=layer.attribute)
-                isomin=layer.vmin
-                isomax=layer.vmax
+                #TODO: remove old check via 'selectedItems'
+                # if filename not in selectedItems:
+                #     continue
+
+                data=layer.layer.compute_fixed_resolution_buffer(target_data=viewer.state.reference_data,
+                                                                 bounds=bounds,
+                                                                 target_cid=layer.attribute)
+                # isomin=layer.vmin
+
 
                 
 
