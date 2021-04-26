@@ -17,8 +17,8 @@ class MainWindow(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Nested Layouts Example")
-        self.setMinimumSize(500, 600)
+        self.setWindowTitle("Choose Layers and Sublayers to save")
+        self.setMinimumSize(600, 700)
 
 
 
@@ -31,7 +31,6 @@ class MainWindow(QWidget):
         detailView = QHBoxLayout() # detailView for selecting options for the selected layer
 
         layersDict = {}
-
 
         # Create the options:
         for layer in layers:
@@ -71,12 +70,20 @@ class MainWindow(QWidget):
         # Register action -> https://stackoverflow.com/questions/9313227/how-to-send-the-selected-item-in-the-listwidget-to-another-function-as-a-paramet/9315013
         listView.itemClicked.connect(lambda item: self.update_detailView(item, layersDict[item.text()]))
 
-        self.selectedLabel = QLabel("")
+        self.selectedLabel = QLabel()
+        self.isoInputLabel = QLabel()
         self.isoInput = QSpinBox()
         self.isoInput.setDisabled(True)
+        self.isoInput.setRange(-10000000, 10000000)  # possible range value for isoInput
+
+        # Align the labels
+        self.selectedLabel.setAlignment(Qt.AlignVCenter)
+        self.isoInputLabel.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
 
         detailView.addWidget(self.selectedLabel)
+        detailView.addWidget(self.isoInputLabel)
         detailView.addWidget(self.isoInput)
+
 
 
         # optionsLayout for Save/Cancel buttons
@@ -104,6 +111,7 @@ class MainWindow(QWidget):
         # print('selectedItem in update_detailView: ', clickedItem.text())
         # print(itemDict)
         self.selectedLabel.setText(clickedItem.text())
+        self.isoInputLabel.setText("Isomin:")
 
         # Disconnect necessary, because otherwise, the self.isoInput.valueChanged.connect(..)
         # would still be active and change OTHER layers instead as well, when switching back
