@@ -10,6 +10,8 @@ from PyQt5.QtCore import Qt
 import glue
 from stlexporter import ICON
 
+from matplotlib.colors import *
+
 import sys
 
 
@@ -19,6 +21,7 @@ class MainWindow(QWidget):
         super().__init__()
         self.setWindowTitle("Choose Layers and Sublayers to save")
         self.setMinimumSize(300, 400)
+        self.exportOBJ = False
 
 
 
@@ -28,12 +31,15 @@ class MainWindow(QWidget):
         # Create a form layout for the label and line edit
         topLayout = QVBoxLayout()
         listView = QListWidget()
-        detailView = QHBoxLayout() # detailView for selecting options for the selected layer
+        detailView = QVBoxLayout() # detailView for selecting options for the selected layer
+        isoView = QHBoxLayout()
 
         layersDict = {}
 
         # Create the options:
-        for layer in layers:
+        # for layer in layers:
+        for idx in range(len(layers)):
+            layer = layers[idx]
 
             #check if subset object
             if isinstance(layer.layer,glue.core.subset_group.GroupedSubset):
@@ -41,6 +47,9 @@ class MainWindow(QWidget):
                 filename = layer.layer.data.label + "_" + layer.layer.label
 
                 isSubLayer = True
+
+                # color = viewer.get_subset_layer_artist(layer.layer).get_layer_color() #getting layer artist succeeds but crashed Vispy!
+                color = viewer.layers[idx].get_layer_color()
 
                 # Search the vmin in the parent-layer
                 for i in range(0,len(layers)):
@@ -52,11 +61,15 @@ class MainWindow(QWidget):
                 isSubLayer = False
                 isomin=layer.vmin
 
+                color = viewer.layers[idx].get_layer_color()
+
                 filename = layer.layer.label
 
             item = QListWidgetItem(filename)
             item.setCheckState(Qt.Checked)
             listView.addItem(item)
+
+            color = rgb2hex(ColorConverter.to_rgb(color))
 
             layersDict[filename] = {
                 "layer": layer,
@@ -64,6 +77,7 @@ class MainWindow(QWidget):
                 "isSubLayer": isSubLayer,
                 "filename": filename,
                 "isomin": isomin,
+                "color": color
             }
 
         # detailView for selecting options for the selected layer
@@ -80,9 +94,18 @@ class MainWindow(QWidget):
         self.selectedLabel.setAlignment(Qt.AlignVCenter)
         self.isoInputLabel.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
 
-        detailView.addWidget(self.selectedLabel)
-        detailView.addWidget(self.isoInputLabel)
-        detailView.addWidget(self.isoInput)
+        self.checkboxOBJ = QCheckBox("Export OBJ Files")
+        self.checkboxOBJ.setDisabled(False)
+        self.checkboxOBJ.toggled.connect(lambda: self.toggleOBJExport())
+
+        topLayout.addWidget(self.checkboxOBJ)
+
+        isoView.addWidget(self.selectedLabel)
+        isoView.addWidget(self.isoInputLabel)
+        isoView.addWidget(self.isoInput)
+
+
+        detailView.addLayout(isoView)
 
 
 
@@ -138,6 +161,9 @@ class MainWindow(QWidget):
         if newValue != itemDict['isomin']:
             itemDict['isomin'] = newValue
             # print('isomin of', itemDict['filename'], 'changed to', newValue)
+
+    def toggleOBJExport(self):
+        self.exportOBJ = not self.exportOBJ
 
 
     def show_new_window(self, viewer, layersDict):
@@ -225,6 +251,11 @@ class MainWindow(QWidget):
 
             iso_data.save(self.savePath + "\\" + filename + ".stl") #save an STL file
 
+            if self.exportOBJ:
+                plotter = pv.Plotter() #create a scene
+                _ = plotter.add_mesh(iso_data, color = selectedItem['color'])
+                plotter.export_obj(self.savePath + "\\" + filename) #save as an OBJ
+
             count += 1
             progress.setValue(count)
 
@@ -254,12 +285,8 @@ class StlExporter(Tool):
         #get the data layers of the viewer.
         layers =  viewer.state.layers
 
-
-        # app = QApplication([])
-        # # self.dialog.setWindowModality(Qt.WindowModal)
         dialog.create_layout(viewer, layers)
         dialog.show()
-        # app.exec_()
 
         # ------------------
 
