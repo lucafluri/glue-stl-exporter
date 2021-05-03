@@ -1,7 +1,7 @@
-STL Exporter for glue
+STL and OBJ Exporter for glue
 ---------------------
 
-This plugin provides an STL Exporting functionality.
+This plugin provides an STL and OBJ exporting functionality.
 
 One can import e.g. a 3D fits data set, then open a "3D Volume Rendering" view. After enabling this plugin,
 that view will have an additional button for exporting and creating an stl file of the 3d data.
