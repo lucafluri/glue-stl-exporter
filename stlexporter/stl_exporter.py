@@ -12,6 +12,8 @@ from stlexporter import ICON
 
 from matplotlib.colors import *
 
+from pathlib import Path
+
 import sys
 
 
@@ -21,6 +23,7 @@ class MainWindow(QWidget):
         super().__init__()
         self.setWindowTitle("Choose Layers and Sublayers to save")
         self.setMinimumSize(300, 400)
+        self.exportSTL = True
         self.exportOBJ = False
 
 
@@ -94,11 +97,17 @@ class MainWindow(QWidget):
         self.selectedLabel.setAlignment(Qt.AlignVCenter)
         self.isoInputLabel.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
 
+        self.checkboxSTL = QCheckBox("Export STL Files")
+        self.checkboxSTL.setDisabled(False)
+        self.checkboxSTL.setChecked(True)
+        self.checkboxSTL.toggled.connect(lambda: self.toggleSTLExport())
+
         self.checkboxOBJ = QCheckBox("Export OBJ Files")
         self.checkboxOBJ.setDisabled(False)
         self.checkboxOBJ.toggled.connect(lambda: self.toggleOBJExport())
 
         topLayout.addWidget(self.checkboxOBJ)
+        topLayout.addWidget(self.checkboxSTL)
 
         isoView.addWidget(self.selectedLabel)
         isoView.addWidget(self.isoInputLabel)
@@ -112,14 +121,14 @@ class MainWindow(QWidget):
         # optionsLayout for Save/Cancel buttons
         optionsLayout = QHBoxLayout()
         # Add some checkboxes to the layout
-        self.buttonSave = QPushButton("Save")
         self.buttonCancel = QPushButton("Cancel")
+        self.buttonSave = QPushButton("Save")
 
         self.buttonSave.clicked.connect(lambda: self.show_new_window(viewer, layersDict))
         self.buttonCancel.clicked.connect(self.close)
 
-        optionsLayout.addWidget(self.buttonSave)
         optionsLayout.addWidget(self.buttonCancel)
+        optionsLayout.addWidget(self.buttonSave)
         # Nest the inner layouts into the outer layout
 
         topLayout.addWidget(listView)
@@ -162,6 +171,11 @@ class MainWindow(QWidget):
             itemDict['isomin'] = newValue
             # print('isomin of', itemDict['filename'], 'changed to', newValue)
 
+
+    def toggleSTLExport(self):
+        self.exportSTL = not self.exportSTL
+
+
     def toggleOBJExport(self):
         self.exportOBJ = not self.exportOBJ
 
@@ -187,8 +201,17 @@ class MainWindow(QWidget):
         bounds = [(viewer.state.z_min, viewer.state.z_max, viewer.state.resolution), (viewer.state.y_min, viewer.state.y_max, viewer.state.resolution), (viewer.state.x_min, viewer.state.x_max, viewer.state.resolution)]
 
         # Create Progress Dialog
-        progress = QProgressDialog("Creating STL files...", None, 0, len(selectedDict))
-        progress.setWindowTitle("STL Export")
+
+        stl_or_obj = ""
+        if(self.exportSTL):
+            stl_or_obj += "STL "
+        if(self.exportSTL and self.exportOBJ):
+            stl_or_obj += "and "
+        if(self.exportOBJ):
+            stl_or_obj += "OBJ "
+
+        progress = QProgressDialog("Creating " + stl_or_obj + "files...", None, 0, len(selectedDict))
+        progress.setWindowTitle(stl_or_obj + "Export")
         progress.setWindowModality(Qt.WindowModal)
         progress.forceShow()
         progress.setValue(0)
@@ -249,12 +272,16 @@ class MainWindow(QWidget):
             # Currently the min limit of the main layer is used
             iso_data = grid.contour([isomin])
 
-            iso_data.save(self.savePath + "\\" + filename + ".stl") #save an STL file
+
+            if self.exportSTL:
+                stl_path = Path(self.savePath, filename + ".stl")
+                iso_data.save(stl_path) #save an STL file
 
             if self.exportOBJ:
+                obj_path = Path(self.savePath, filename)
                 plotter = pv.Plotter() #create a scene
                 _ = plotter.add_mesh(iso_data, color = selectedItem['color'])
-                plotter.export_obj(self.savePath + "\\" + filename) #save as an OBJ
+                plotter.export_obj(obj_path) #save as an OBJ
 
             count += 1
             progress.setValue(count)
