@@ -21,11 +21,85 @@ class Worker(QObject):
     finished = pyqtSignal()
     progress = pyqtSignal(int)
 
-    def run(self):
+    def __init__(self):
+        super(Worker, self).__init__()
+        self._isRunning = True
+
+    def stop(self):
+        self._isRunning = False
+
+    def run(self, viewer, selectedDict, bounds, exportSTL, exportOBJ, savePath):
         """Long-running task."""
-        for i in range(5):
-            sleep(1)
-            self.progress.emit(i + 1)
+        count = 0
+        for selectedItem in selectedDict.values():
+            if not self._isRunning:
+                break
+
+            layer = selectedItem['layer']
+            filename = selectedItem['filename']
+            isomin = selectedItem['isomin']
+
+            # check if subset object
+            if isinstance(layer.layer, glue.core.subset_group.GroupedSubset):
+
+                subcube = layer.layer.data.compute_fixed_resolution_buffer(target_data=viewer.state.reference_data,
+                                                                           bounds=bounds,
+                                                                           subset_state=layer.layer.subset_state)
+                datacube = layer.layer.data.compute_fixed_resolution_buffer(target_data=viewer.state.reference_data,
+                                                                            bounds=bounds,
+                                                                            target_cid=layer.attribute)
+                data = subcube * datacube
+
+            # otherwise a data object
+            else:
+                data = layer.layer.compute_fixed_resolution_buffer(target_data=viewer.state.reference_data,
+                                                                   bounds=bounds,
+                                                                   target_cid=layer.attribute)
+
+            # apply smoothing to the data to create nicer surfaces on the model. Ultimately we will probably want users to set this
+            data = filters.gaussian_filter(data, 1)
+
+            x_origin = viewer.state.x_min  # collect the lower left hand corner pixel x,y,z values of the grid for pyvista
+            y_origin = viewer.state.y_min
+            z_origin = viewer.state.z_min
+
+            # I think the voxel spacing will always be 1, because of how glue downsamples to a fixed resolution grid. But don't hold me to this!
+            x_dist = 1
+            y_dist = 1
+            z_dist = 1
+
+            # weird conventions between pyvista and glue data storage.
+            data = data.transpose(2, 1, 0)
+
+            # create pyvista grid
+            grid = pv.UniformGrid()  # create a spatial reference
+
+            grid.dimensions = (viewer.state.resolution, viewer.state.resolution,
+                               viewer.state.resolution)  # set the grid dimensions to match our data
+
+            # edit the spatial reference assuming pixel coordinates using the info extracted from the header earlier
+            grid.origin = (x_origin, y_origin, z_origin)  # the bottom left corner of the data set
+            grid.spacing = (z_dist, y_dist, x_dist)  # the cell sizes along each axis
+
+            grid.point_arrays["values"] = data.flatten(
+                order="F")  # add the data values to the cell data and flatten the array
+
+            # We will want to ultimately open a GUI for user to pick this themselves.
+            # Currently the min limit of the main layer is used
+            iso_data = grid.contour([isomin])
+
+            if exportSTL:
+                stl_path = Path(savePath, filename + ".stl")
+                iso_data.save(stl_path)  # save an STL file
+
+            if exportOBJ:
+                obj_path = Path(savePath, filename)
+                plotter = pv.Plotter()  # create a scene
+                _ = plotter.add_mesh(iso_data, color=selectedItem['color'])
+                plotter.export_obj(obj_path)  # save as an OBJ
+
+            self.progress.emit(count + 1)
+            count += 1
         self.finished.emit()
 
 
@@ -145,13 +219,6 @@ class MainWindow(QWidget):
 
 
 
-        self.stepLabel = QLabel("Long-Running Step: 0")
-        self.longRunningBt = QPushButton("Simulate 5s")
-        self.longRunningBt.clicked.connect(self.runLongTask)
-        detailView.addWidget(self.stepLabel)
-        detailView.addWidget(self.longRunningBt)
-
-
         topLayout.addWidget(listView)
         outerLayout.addLayout(topLayout)
         outerLayout.addLayout(detailView)
@@ -160,40 +227,10 @@ class MainWindow(QWidget):
         self.setLayout(outerLayout)
 
 
-
-
-
-    # TODO: test-section for multithreading
     def reportProgress(self, n):
-        self.stepLabel.setText(f"Long Running Step: {n}")
-
-    # TODO: test-section for multithreading
-    def runLongTask(self):
-        """Long-running task in 5 steps."""
-        # TODO: test-section for multithreading
-        # Step 2: Create a QThread object
-        self.thread = QThread()
-        # Step 3: Create a worker object
-        self.worker = Worker()
-        # Step 4: Move worker to the thread
-        self.worker.moveToThread(self.thread)
-        # Step 5: Connect signals and slots
-        self.thread.started.connect(self.worker.run)
-        self.worker.finished.connect(self.thread.quit)
-        self.worker.finished.connect(self.worker.deleteLater)
-        self.thread.finished.connect(self.thread.deleteLater)
-        self.worker.progress.connect(self.reportProgress)
-        # Step 6: Start the thread
-        self.thread.start()
-
-        # Final resets
-        self.longRunningBtn.setEnabled(False)
-        self.thread.finished.connect(
-            lambda: self.longRunningBtn.setEnabled(True)
-        )
-        self.thread.finished.connect(
-            lambda: self.stepLabel.setText("Long-Running Step: 0")
-        )
+        print(f"Progress: {n}")
+        self.progress.setValue(n)
+        # self.stepLabel.setText(f"Long Running Step: {n}")
 
 
     def update_detailView(self, clickedItem, itemDict):
@@ -267,81 +304,41 @@ class MainWindow(QWidget):
         if(self.exportOBJ):
             stl_or_obj += "OBJ "
 
-        progress = QProgressDialog("Creating " + stl_or_obj + "files...", None, 0, len(selectedDict))
-        progress.setWindowTitle(stl_or_obj + "Export")
-        progress.setWindowModality(Qt.WindowModal)
-        progress.forceShow()
-        progress.setValue(0)
+        self.progress = QProgressDialog("Creating " + stl_or_obj + "files...", None, 0, len(selectedDict))
+        self.progress.setWindowTitle(stl_or_obj + "Export")
+        self.progress.setWindowModality(Qt.WindowModal)
+        self.progress.forceShow()
+        self.progress.setValue(0)
 
         count = 0
 
-        for selectedItem in selectedDict.values():
+        # Multithreading:
+        # Step 2: Create a QThread object
+        self.thread = QThread()
+        # Step 3: Create a worker object
+        self.worker = Worker()
+        # Step 4: Move worker to the thread
+        self.worker.moveToThread(self.thread)
+        # Step 5: Connect signals and slots
+        self.thread.started.connect(lambda: self.worker.run(viewer, selectedDict, bounds, self.exportSTL, self.exportOBJ, self.savePath))
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.worker.progress.connect(self.reportProgress)
+        self.progress.canceled.connect(self.worker.stop)
+        # Step 6: Start the thread
+        self.thread.start()
 
-            layer = selectedItem['layer']
-            filename = selectedItem['filename']
-            isomin = selectedItem['isomin']
-
-            #check if subset object
-            if isinstance(layer.layer,glue.core.subset_group.GroupedSubset):
-
-                subcube=layer.layer.data.compute_fixed_resolution_buffer(target_data=viewer.state.reference_data,
-                                                                         bounds=bounds,
-                                                                         subset_state=layer.layer.subset_state)
-                datacube=layer.layer.data.compute_fixed_resolution_buffer(target_data=viewer.state.reference_data,
-                                                                          bounds=bounds,
-                                                                          target_cid=layer.attribute)
-                data=subcube*datacube
-
-            #otherwise a data object
-            else:
-                data=layer.layer.compute_fixed_resolution_buffer(target_data=viewer.state.reference_data,
-                                                                 bounds=bounds,
-                                                                 target_cid=layer.attribute)
-
-
-            #apply smoothing to the data to create nicer surfaces on the model. Ultimately we will probably want users to set this
-            data = filters.gaussian_filter(data,1)
-
-            x_origin = viewer.state.x_min #collect the lower left hand corner pixel x,y,z values of the grid for pyvista
-            y_origin = viewer.state.y_min
-            z_origin = viewer.state.z_min
-
-            #I think the voxel spacing will always be 1, because of how glue downsamples to a fixed resolution grid. But don't hold me to this!
-            x_dist = 1
-            y_dist = 1
-            z_dist = 1
-
-            #weird conventions between pyvista and glue data storage.
-            data = data.transpose(2,1,0)
-
-            #create pyvista grid
-            grid = pv.UniformGrid() #create a spatial reference
-
-            grid.dimensions = (viewer.state.resolution, viewer.state.resolution, viewer.state.resolution) # set the grid dimensions to match our data
-
-            #edit the spatial reference assuming pixel coordinates using the info extracted from the header earlier
-            grid.origin = (x_origin, y_origin, z_origin)  #the bottom left corner of the data set
-            grid.spacing = (z_dist, y_dist, x_dist)  #the cell sizes along each axis
-
-            grid.point_arrays["values"] = data.flatten(order="F")  #add the data values to the cell data and flatten the array
-
-            # We will want to ultimately open a GUI for user to pick this themselves.
-            # Currently the min limit of the main layer is used
-            iso_data = grid.contour([isomin])
+        # TODO: Final resets  ???
+        # self.longRunningBtn.setEnabled(False)
+        # self.thread.finished.connect(
+        #     lambda: self.longRunningBtn.setEnabled(True)
+        # )
+        # self.thread.finished.connect(
+        #     lambda: self.stepLabel.setText("Long-Running Step: 0")
+        # )
 
 
-            if self.exportSTL:
-                stl_path = Path(self.savePath, filename + ".stl")
-                iso_data.save(stl_path) #save an STL file
-
-            if self.exportOBJ:
-                obj_path = Path(self.savePath, filename)
-                plotter = pv.Plotter() #create a scene
-                _ = plotter.add_mesh(iso_data, color = selectedItem['color'])
-                plotter.export_obj(obj_path) #save as an OBJ
-
-            count += 1
-            progress.setValue(count)
 
 
 
