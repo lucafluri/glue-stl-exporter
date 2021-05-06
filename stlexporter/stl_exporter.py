@@ -112,8 +112,6 @@ class MainWindow(QWidget):
         self.exportSTL = True
         self.exportOBJ = False
 
-
-
     def create_layout(self, viewer, layers):
         # Create an outer layout
         outerLayout = QVBoxLayout()
@@ -199,10 +197,7 @@ class MainWindow(QWidget):
         isoView.addWidget(self.isoInputLabel)
         isoView.addWidget(self.isoInput)
 
-
         detailView.addLayout(isoView)
-
-
 
         # optionsLayout for Save/Cancel buttons
         optionsLayout = QHBoxLayout()
@@ -217,8 +212,6 @@ class MainWindow(QWidget):
         optionsLayout.addWidget(self.buttonSave)
         # Nest the inner layouts into the outer layout
 
-
-
         topLayout.addWidget(listView)
         outerLayout.addLayout(topLayout)
         outerLayout.addLayout(detailView)
@@ -230,7 +223,6 @@ class MainWindow(QWidget):
     def reportProgress(self, n):
         print(f"Progress: {n}")
         self.progress.setValue(n)
-        # self.stepLabel.setText(f"Long Running Step: {n}")
 
 
     def update_detailView(self, clickedItem, itemDict):
@@ -258,7 +250,6 @@ class MainWindow(QWidget):
         self.isoInput.valueChanged.connect(lambda newValue: self.update_isomin(newValue, itemDict))
 
 
-
     def update_isomin(self, newValue, itemDict):
         # ONLY change the value, if there was a actual change:
         if newValue != itemDict['isomin']:
@@ -281,8 +272,6 @@ class MainWindow(QWidget):
                 filename = dictItem['filename']
                 selectedDict[filename] = dictItem
 
-        # print('layersDict', layersDict)
-        # print('selectedDict', selectedDict)
 
         self.savePath = QFileDialog.getExistingDirectory()
 
@@ -294,8 +283,7 @@ class MainWindow(QWidget):
         #grab the xyz bounds of the viewer
         bounds = [(viewer.state.z_min, viewer.state.z_max, viewer.state.resolution), (viewer.state.y_min, viewer.state.y_max, viewer.state.resolution), (viewer.state.x_min, viewer.state.x_max, viewer.state.resolution)]
 
-        # Create Progress Dialog
-
+        # STL and/or OBJ export - string-creation:
         stl_or_obj = ""
         if(self.exportSTL):
             stl_or_obj += "STL "
@@ -304,13 +292,13 @@ class MainWindow(QWidget):
         if(self.exportOBJ):
             stl_or_obj += "OBJ "
 
+        # Create Progress Dialog
         self.progress = QProgressDialog("Creating " + stl_or_obj + "files...", None, 0, len(selectedDict))
         self.progress.setWindowTitle(stl_or_obj + "Export")
         self.progress.setWindowModality(Qt.WindowModal)
         self.progress.forceShow()
         self.progress.setValue(0)
 
-        count = 0
 
         # Multithreading:
         # Step 2: Create a QThread object
@@ -329,17 +317,6 @@ class MainWindow(QWidget):
         # Step 6: Start the thread
         self.thread.start()
 
-        # TODO: Final resets  ???
-        # self.longRunningBtn.setEnabled(False)
-        # self.thread.finished.connect(
-        #     lambda: self.longRunningBtn.setEnabled(True)
-        # )
-        # self.thread.finished.connect(
-        #     lambda: self.stepLabel.setText("Long-Running Step: 0")
-        # )
-
-
-
 
 
 @viewer_tool
@@ -349,10 +326,8 @@ class StlExporter(Tool):
     action_text = 'STL Exporter'
     tool_tip = 'STL Exporter'
 
-
     def __init__(self, viewer):
         super(StlExporter, self).__init__(viewer)
-
 
     def createAndSaveSTL(self):
         pass
@@ -370,9 +345,6 @@ class StlExporter(Tool):
         dialog.show()
 
         # ------------------
-
-
-
 
 
     def close(self):
